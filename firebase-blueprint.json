@@ -1,0 +1,291 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student profile, pedagogical preferences, and learning progress metrics",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique Firebase Authentication UID of the student",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Student full name",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "description": "Student email address",
+          "format": "email",
+          "maxLength": 150
+        },
+        "academicLevel": {
+          "type": "string",
+          "description": "Student academic rigor tier",
+          "enum": ["HIGH_SCHOOL", "UNDERGRADUATE", "GRADUATE", "PROFESSIONAL"]
+        },
+        "learningPace": {
+          "type": "string",
+          "description": "Preferred learning acceleration pace",
+          "enum": ["FAST", "BALANCED", "DEEP_DIVE"]
+        },
+        "preferredStrategy": {
+          "type": "string",
+          "description": "Primary pedagogical teaching approach",
+          "enum": [
+            "SIMPLE_EXPLANATION",
+            "REAL_WORLD_ANALOGY",
+            "STEP_BY_STEP",
+            "PRACTICAL_EXAMPLE",
+            "COMPARISON",
+            "QUESTION_LED",
+            "ACADEMIC_DEEP_DIVE"
+          ]
+        },
+        "targetGoal": {
+          "type": "string",
+          "description": "Academic objective or exam target",
+          "maxLength": 200
+        },
+        "focusSubject": {
+          "type": "string",
+          "description": "Primary discipline or course subject",
+          "maxLength": 100
+        },
+        "streakDays": {
+          "type": "number",
+          "description": "Consecutive days of study activity"
+        },
+        "totalStudyMinutes": {
+          "type": "number",
+          "description": "Cumulative minutes spent in active lectures"
+        },
+        "masteredConceptsCount": {
+          "type": "number",
+          "description": "Total concepts validated at Mastered tier"
+        },
+        "inProgressConceptsCount": {
+          "type": "number",
+          "description": "Total concepts currently in progress"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of account creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last profile update"
+        }
+      },
+      "required": ["id", "name", "email", "academicLevel", "learningPace", "preferredStrategy", "createdAt", "updatedAt"]
+    },
+    "StudyMaterial": {
+      "title": "StudyMaterial",
+      "description": "Uploaded student syllabus, lecture slides, or textbook chapter",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique material identifier",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the owning student",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the study material",
+          "maxLength": 200
+        },
+        "originalFileName": {
+          "type": "string",
+          "description": "Original file name uploaded",
+          "maxLength": 255
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Format of the document",
+          "enum": ["pdf", "docx", "txt"]
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Size in bytes"
+        },
+        "processingStatus": {
+          "type": "string",
+          "description": "Ingestion pipeline state",
+          "enum": ["UPLOADED", "PROCESSING", "READY", "FAILED"]
+        },
+        "summary": {
+          "type": "string",
+          "description": "Extracted academic summary",
+          "maxLength": 5000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of material upload"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["id", "userId", "title", "originalFileName", "fileType", "fileSize", "processingStatus", "createdAt", "updatedAt"]
+    },
+    "DiagnosticEvaluation": {
+      "title": "DiagnosticEvaluation",
+      "description": "Socratic 4-tier formative assessment of student understanding",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique diagnostic record identifier",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the evaluated student",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "materialId": {
+          "type": "string",
+          "description": "Associated study material ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "conceptName": {
+          "type": "string",
+          "description": "Concept being evaluated",
+          "maxLength": 150
+        },
+        "level": {
+          "type": "string",
+          "description": "Assessed cognitive mastery tier",
+          "enum": ["NOT_UNDERSTOOD", "PARTIALLY_UNDERSTOOD", "UNDERSTOOD", "MASTERED"]
+        },
+        "score": {
+          "type": "number",
+          "description": "Calculated percentage score from 0 to 100"
+        },
+        "questionAsked": {
+          "type": "string",
+          "description": "The Socratic probe or prompt presented",
+          "maxLength": 1000
+        },
+        "studentAnswer": {
+          "type": "string",
+          "description": "The student's verbatim explanation",
+          "maxLength": 3000
+        },
+        "feedbackMessage": {
+          "type": "string",
+          "description": "Socratic qualitative feedback from Dr. CoreStack",
+          "maxLength": 3000
+        },
+        "recommendedStrategy": {
+          "type": "string",
+          "description": "Pedagogical strategy advised for remediation",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of evaluation"
+        }
+      },
+      "required": ["id", "userId", "materialId", "conceptName", "level", "score", "questionAsked", "studentAnswer", "feedbackMessage", "recommendedStrategy", "createdAt"]
+    },
+    "LearningSession": {
+      "title": "LearningSession",
+      "description": "Interactive pedagogical lecture session record",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique session ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the student in session",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "materialId": {
+          "type": "string",
+          "description": "Associated study material ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "topicTitle": {
+          "type": "string",
+          "description": "Active topic in session",
+          "maxLength": 200
+        },
+        "conceptTitle": {
+          "type": "string",
+          "description": "Active concept in session",
+          "maxLength": 200
+        },
+        "status": {
+          "type": "string",
+          "description": "Session active state",
+          "enum": ["ACTIVE", "PAUSED", "COMPLETED"]
+        },
+        "currentStrategy": {
+          "type": "string",
+          "description": "Active pedagogical teaching strategy",
+          "maxLength": 64
+        },
+        "messagesCount": {
+          "type": "number",
+          "description": "Total messages exchanged"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of session start"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of session update"
+        }
+      },
+      "required": ["id", "userId", "materialId", "topicTitle", "conceptTitle", "status", "currentStrategy", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Individual student profiles containing preferences and aggregate mastery metrics"
+    },
+    "/studyMaterials/{materialId}": {
+      "schema": {
+        "$ref": "#/entities/StudyMaterial"
+      },
+      "description": "Uploaded and pre-loaded study materials belonging to students"
+    },
+    "/diagnosticEvaluations/{diagnosticId}": {
+      "schema": {
+        "$ref": "#/entities/DiagnosticEvaluation"
+      },
+      "description": "Formative Socratic assessment scores and misconception records"
+    },
+    "/learningSessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/LearningSession"
+      },
+      "description": "Active and archived interactive lecture dialogue sessions"
+    }
+  }
+}

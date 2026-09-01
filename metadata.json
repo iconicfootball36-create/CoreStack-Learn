@@ -1,0 +1,6 @@
+{
+  "name": "CoreStack Learn",
+  "description": "AI-powered personalized lecturer that adapts teaching to individual students, checks understanding continuously, and ensures genuine mastery of course materials.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

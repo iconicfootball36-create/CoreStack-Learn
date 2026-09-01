@@ -1,0 +1,231 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------------------
+    // User Profile Validation & Rules
+    // -------------------------------------------------------------------------
+    function isValidUser(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 150 &&
+             data.academicLevel in ['HIGH_SCHOOL', 'UNDERGRADUATE', 'GRADUATE', 'PROFESSIONAL'] &&
+             data.learningPace in ['FAST', 'BALANCED', 'DEEP_DIVE'] &&
+             data.preferredStrategy in [
+               'SIMPLE_EXPLANATION',
+               'REAL_WORLD_ANALOGY',
+               'STEP_BY_STEP',
+               'PRACTICAL_EXAMPLE',
+               'COMPARISON',
+               'QUESTION_LED',
+               'ACADEMIC_DEEP_DIVE'
+             ] &&
+             (!('targetGoal' in data) || (data.targetGoal is string && data.targetGoal.size() <= 200)) &&
+             (!('focusSubject' in data) || (data.focusSubject is string && data.focusSubject.size() <= 100)) &&
+             (!('streakDays' in data) || (data.streakDays is number && data.streakDays >= 0)) &&
+             (!('totalStudyMinutes' in data) || (data.totalStudyMinutes is number && data.totalStudyMinutes >= 0)) &&
+             (!('masteredConceptsCount' in data) || (data.masteredConceptsCount is number && data.masteredConceptsCount >= 0)) &&
+             (!('inProgressConceptsCount' in data) || (data.inProgressConceptsCount is number && data.inProgressConceptsCount >= 0)) &&
+             data.createdAt is string && data.createdAt.size() <= 50 &&
+             data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false; // Users cannot enumerate other users
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().id == userId &&
+                       isValidUser(incoming()) &&
+                       incoming().keys().hasAll(['id', 'name', 'email', 'academicLevel', 'learningPace', 'preferredStrategy', 'createdAt', 'updatedAt']);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().id == existing().id &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUser(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name',
+                         'academicLevel',
+                         'learningPace',
+                         'preferredStrategy',
+                         'targetGoal',
+                         'focusSubject',
+                         'streakDays',
+                         'totalStudyMinutes',
+                         'masteredConceptsCount',
+                         'inProgressConceptsCount',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Study Materials Validation & Rules
+    // -------------------------------------------------------------------------
+    function isValidStudyMaterial(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.originalFileName is string && data.originalFileName.size() <= 255 &&
+             data.fileType in ['pdf', 'docx', 'txt'] &&
+             data.fileSize is number && data.fileSize >= 0 && data.fileSize <= 104857600 &&
+             data.processingStatus in ['UPLOADED', 'PROCESSING', 'READY', 'FAILED'] &&
+             (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000)) &&
+             data.createdAt is string && data.createdAt.size() <= 50 &&
+             data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    match /studyMaterials/{materialId} {
+      allow get: if isSignedIn() && isValidId(materialId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(materialId) &&
+                       incoming().id == materialId &&
+                       isValidStudyMaterial(incoming()) &&
+                       incoming().keys().hasAll(['id', 'userId', 'title', 'originalFileName', 'fileType', 'fileSize', 'processingStatus', 'createdAt', 'updatedAt']);
+
+      allow update: if isSignedIn() &&
+                       isValidId(materialId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().id == existing().id &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidStudyMaterial(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title',
+                         'processingStatus',
+                         'summary',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(materialId) && existing().userId == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // Socratic Diagnostic Evaluations Validation & Rules
+    // -------------------------------------------------------------------------
+    function isValidDiagnostic(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.materialId is string && data.materialId.size() <= 128 &&
+             data.conceptName is string && data.conceptName.size() > 0 && data.conceptName.size() <= 150 &&
+             data.level in ['NOT_UNDERSTOOD', 'PARTIALLY_UNDERSTOOD', 'UNDERSTOOD', 'MASTERED'] &&
+             data.score is number && data.score >= 0 && data.score <= 100 &&
+             data.questionAsked is string && data.questionAsked.size() <= 1000 &&
+             data.studentAnswer is string && data.studentAnswer.size() <= 3000 &&
+             data.feedbackMessage is string && data.feedbackMessage.size() <= 3000 &&
+             data.recommendedStrategy is string && data.recommendedStrategy.size() <= 64 &&
+             data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    match /diagnosticEvaluations/{diagnosticId} {
+      allow get: if isSignedIn() && isValidId(diagnosticId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(diagnosticId) &&
+                       incoming().id == diagnosticId &&
+                       isValidDiagnostic(incoming()) &&
+                       incoming().keys().hasAll([
+                         'id',
+                         'userId',
+                         'materialId',
+                         'conceptName',
+                         'level',
+                         'score',
+                         'questionAsked',
+                         'studentAnswer',
+                         'feedbackMessage',
+                         'recommendedStrategy',
+                         'createdAt'
+                       ]);
+
+      allow update: if false; // Diagnostic records are immutable history
+      allow delete: if isSignedIn() && isValidId(diagnosticId) && existing().userId == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // Learning Sessions Validation & Rules
+    // -------------------------------------------------------------------------
+    function isValidSession(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.materialId is string && data.materialId.size() <= 128 &&
+             data.topicTitle is string && data.topicTitle.size() <= 200 &&
+             data.conceptTitle is string && data.conceptTitle.size() <= 200 &&
+             data.status in ['ACTIVE', 'PAUSED', 'COMPLETED'] &&
+             data.currentStrategy is string && data.currentStrategy.size() <= 64 &&
+             (!('messagesCount' in data) || (data.messagesCount is number && data.messagesCount >= 0)) &&
+             data.createdAt is string && data.createdAt.size() <= 50 &&
+             data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    match /learningSessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(sessionId) &&
+                       incoming().id == sessionId &&
+                       isValidSession(incoming()) &&
+                       incoming().keys().hasAll([
+                         'id',
+                         'userId',
+                         'materialId',
+                         'topicTitle',
+                         'conceptTitle',
+                         'status',
+                         'currentStrategy',
+                         'createdAt',
+                         'updatedAt'
+                       ]);
+
+      allow update: if isSignedIn() &&
+                       isValidId(sessionId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().id == existing().id &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidSession(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'status',
+                         'currentStrategy',
+                         'messagesCount',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(sessionId) && existing().userId == request.auth.uid;
+    }
+  }
+}

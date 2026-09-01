@@ -1,0 +1,315 @@
+// CoreStack Learn - Prisma Database Schema
+// Scalable relational schema for the AI Personal Lecturer Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MaterialProcessingStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum FileType {
+  PDF
+  DOCX
+  TXT
+}
+
+enum UnderstandingLevel {
+  NOT_UNDERSTOOD
+  PARTIALLY_UNDERSTOOD
+  UNDERSTOOD
+  MASTERED
+}
+
+enum TeachingStrategy {
+  SIMPLE_EXPLANATION
+  REAL_WORLD_ANALOGY
+  STEP_BY_STEP
+  PRACTICAL_EXAMPLE
+  COMPARISON
+  QUESTION_LED
+  ACADEMIC_DEEP_DIVE
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  EXPLAIN_IN_YOUR_OWN_WORDS
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum MessageRole {
+  USER
+  LECTURER
+  SYSTEM
+}
+
+enum MessageType {
+  EXPLANATION
+  QUESTION
+  STUDENT_REPLY
+  EVALUATION
+  RE_TEACHING
+  ACTION_TRIGGER
+}
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  materials    StudyMaterial[]
+  courses      Course[]
+  sessions     LearningSession[]
+  quizzes      Quiz[]
+  answers      StudentAnswer[]
+  progress     MasteryProgress[]
+
+  @@index([email])
+}
+
+model StudyMaterial {
+  id               String                   @id @default(cuid())
+  userId           String
+  title            String
+  originalFileName String
+  fileType         FileType
+  fileSize         Int
+  storageUrl       String?
+  processingStatus MaterialProcessingStatus @default(UPLOADED)
+  extractedText    String?                  @db.Text
+  summary          String?                  @db.Text
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks           DocumentChunk[]
+  courses          Course[]
+
+  @@index([userId])
+  @@index([processingStatus])
+}
+
+model DocumentChunk {
+  id          String        @id @default(cuid())
+  materialId  String
+  chunkIndex  Int
+  content     String        @db.Text
+  tokenCount  Int?
+  heading     String?
+  section     String?
+  createdAt   DateTime      @default(now())
+
+  material    StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId, chunkIndex])
+}
+
+model Course {
+  id               String          @id @default(cuid())
+  userId           String
+  materialId       String
+  title            String
+  description      String          @db.Text
+  subject          String
+  recommendedOrder Int             @default(1)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material         StudyMaterial   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  topics           Topic[]
+
+  @@index([userId])
+  @@index([materialId])
+}
+
+model Topic {
+  id               String            @id @default(cuid())
+  courseId         String
+  title            String
+  description      String            @db.Text
+  orderIndex       Int
+  estimatedMinutes Int               @default(15)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  course           Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  concepts         Concept[]
+  sessions         LearningSession[]
+  quizzes          Quiz[]
+  progress         MasteryProgress[]
+
+  @@index([courseId, orderIndex])
+}
+
+model Concept {
+  id          String                    @id @default(cuid())
+  topicId     String
+  title       String
+  definition  String                    @db.Text
+  keyPoints   String[]
+  orderIndex  Int
+  difficulty  String                    @default("INTERMEDIATE")
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  topic       Topic                     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  evaluations UnderstandingEvaluation[]
+  questions   QuizQuestion[]
+  progress    MasteryProgress[]
+
+  @@index([topicId, orderIndex])
+}
+
+model LearningSession {
+  id              String                    @id @default(cuid())
+  userId          String
+  topicId         String
+  activeConceptId String?
+  status          SessionStatus             @default(ACTIVE)
+  currentStrategy TeachingStrategy          @default(SIMPLE_EXPLANATION)
+  startedAt       DateTime                  @default(now())
+  completedAt     DateTime?
+
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic           Topic                     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  messages        ConversationMessage[]
+  evaluations     UnderstandingEvaluation[]
+
+  @@index([userId])
+  @@index([topicId])
+}
+
+model ConversationMessage {
+  id                   String          @id @default(cuid())
+  sessionId            String
+  sender               MessageRole
+  content              String          @db.Text
+  messageType          MessageType     @default(EXPLANATION)
+  conceptId            String?
+  strategyUsed         TeachingStrategy?
+  isGroundedInMaterial Boolean         @default(true)
+  metadata             Json?
+  createdAt            DateTime        @default(now())
+
+  session              LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model UnderstandingEvaluation {
+  id                            String             @id @default(cuid())
+  sessionId                     String
+  conceptId                     String
+  studentAnswer                 String             @db.Text
+  level                         UnderstandingLevel
+  score                         Int
+  correctnessAnalysis           String             @db.Text
+  conceptualUnderstandingScore  Int
+  completenessScore             Int
+  misconceptions                String[]
+  evidenceFound                 String[]
+  recommendedStrategy           TeachingStrategy
+  recommendedAction             String             @db.Text
+  createdAt                     DateTime           @default(now())
+
+  session                       LearningSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  concept                       Concept            @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([conceptId])
+}
+
+model Quiz {
+  id        String          @id @default(cuid())
+  topicId   String
+  userId    String
+  title     String
+  difficulty String         @default("ADAPTIVE")
+  createdAt DateTime        @default(now())
+
+  topic     Topic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  answers   StudentAnswer[]
+
+  @@index([topicId])
+  @@index([userId])
+}
+
+model QuizQuestion {
+  id               String          @id @default(cuid())
+  quizId           String
+  conceptId        String?
+  type             QuestionType
+  prompt           String          @db.Text
+  options          String[]
+  correctAnswer    String          @db.Text
+  explanation      String          @db.Text
+  groundingExcerpt String          @db.Text
+
+  quiz             Quiz            @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  concept          Concept?        @relation(fields: [conceptId], references: [id], onDelete: SetNull)
+  answers          StudentAnswer[]
+
+  @@index([quizId])
+}
+
+model StudentAnswer {
+  id              String        @id @default(cuid())
+  quizId          String
+  questionId      String
+  userId          String
+  submittedAnswer String        @db.Text
+  isCorrect       Boolean
+  score           Int
+  feedback        String        @db.Text
+  createdAt       DateTime      @default(now())
+
+  quiz            Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question        QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([userId])
+}
+
+model MasteryProgress {
+  id                String             @id @default(cuid())
+  userId            String
+  conceptId         String
+  topicId           String
+  level             UnderstandingLevel @default(NOT_UNDERSTOOD)
+  masteryPercentage Int                @default(0)
+  attemptsCount     Int                @default(0)
+  isWeakArea        Boolean            @default(false)
+  lastStudiedAt     DateTime           @default(now())
+  lastEvaluatedAt   DateTime           @default(now())
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  concept           Concept            @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  topic             Topic              @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conceptId])
+  @@index([userId, topicId])
+  @@index([userId, isWeakArea])
+}
