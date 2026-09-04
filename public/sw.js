@@ -1,4 +1,4 @@
-const CACHE_NAME = 'corestack-learn-shell-v1';
+const CACHE_NAME = 'corestack-learn-shell-v2';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icon-192.svg', '/icon-512.svg'];
 
 self.addEventListener('install', (event) => {
@@ -16,12 +16,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const requestUrl = new URL(event.request.url);
+  if (
+    event.request.method !== 'GET' ||
+    requestUrl.protocol !== 'http:' && requestUrl.protocol !== 'https:' ||
+    requestUrl.origin !== self.location.origin
+  ) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok || response.type === 'opaque') {
+          caches.open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, copy))
+            .catch(() => undefined);
+        }
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),
