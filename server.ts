@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { AuthStore } from './src/server/authStore';
@@ -578,7 +579,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const workingDistPath = path.join(process.cwd(), 'dist');
+    const bundledDistPath = path.dirname(process.argv[1]);
+    const distPath = fs.existsSync(path.join(workingDistPath, 'index.html'))
+      ? workingDistPath
+      : bundledDistPath;
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
