@@ -303,40 +303,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const demoLogin = async () => {
-    if (!auth) {
-      throw new Error('Firebase is not configured for this deployment.');
-    }
-
     const demoEmail = 'alex.student@corestack.edu';
     const demoPassword = 'learn123';
-    let demoUser: FirebaseUser;
+    let firebaseError: any = null;
 
-    try {
-      demoUser = (await signInWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
-    } catch (error: any) {
-      if (error.code === 'auth/operation-not-allowed') {
-        throw new Error('Enable Email/Password under Firebase Console → Authentication → Sign-in method before using Demo Login.');
-      }
-      if (!['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(error.code)) {
-        throw new Error(error.message || 'Demo login failed.');
-      }
-
+    if (auth) {
       try {
-        demoUser = (await createUserWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
-      } catch (createError: any) {
-        if (createError.code === 'auth/email-already-in-use') {
-          throw new Error('The demo account already exists with a different password. Reset it or create a Firebase user with email alex.student@corestack.edu and password learn123.');
-        }
-        throw new Error(createError.message || 'Demo account could not be created.');
+        const demoUser = (await signInWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
+        await syncFirebaseProfile(demoUser, {
+          name: 'Abdulsalam',
+          email: demoEmail,
+          focusSubject: 'General Studies',
+        });
+        return;
+      } catch (error: any) {
+        firebaseError = error;
       }
-      await updateFirebaseProfile(demoUser, { displayName: 'Abdulsalam' });
     }
 
-    await syncFirebaseProfile(demoUser, {
-      name: 'Abdulsalam',
-      email: demoEmail,
-      focusSubject: 'General Studies',
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: demoEmail, password: demoPassword }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+        setUser(data.user);
+        setIsLoading(false);
+        return;
+      }
+      if (response.status === 404) {
+        throw new Error('Demo login needs Firebase Email/Password enabled, or the app must be deployed with its Node API.');
+      }
+      throw new Error(data.error || 'Demo login failed.');
+    } catch (backendError: any) {
+      if (backendError.message.includes('Demo login needs')) throw backendError;
+      if (firebaseError?.code === 'auth/operation-not-allowed') {
+        throw new Error('Enable Email/Password under Firebase Console → Authentication → Sign-in method.');
+      }
+      throw new Error(firebaseError?.message || backendError.message || 'Demo login failed.');
+    }
   };
 
   const register = async (params: RegisterParams) => {
