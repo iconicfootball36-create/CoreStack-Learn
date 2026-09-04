@@ -246,6 +246,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (fbErr: any) {
         console.info('Firebase direct email sign-in status:', fbErr.code || fbErr.message);
+        if (fbErr.code === 'auth/operation-not-allowed') {
+          setIsLoading(false);
+          throw new Error('Email/password sign-in is disabled in Firebase. Enable Email/Password under Firebase Console → Authentication → Sign-in method.');
+        }
       }
     }
 
@@ -260,6 +264,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error('The hosted authentication API is not deployed. Deploy the app as a Node web service with npm start, or enable Firebase Email/Password authentication.');
+          }
           throw new Error(data.error || 'Failed to sign in.');
         }
 
@@ -340,6 +347,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       } catch (fbErr: any) {
         console.info('Firebase Auth registration notice (fallback active):', fbErr.code || fbErr.message);
+        if (fbErr.code === 'auth/operation-not-allowed') {
+          setIsLoading(false);
+          throw new Error('Email/password account creation is disabled in Firebase. Enable Email/Password under Firebase Console → Authentication → Sign-in method.');
+        }
       }
     }
 
@@ -354,6 +365,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error('The hosted authentication API is not deployed. Deploy the app as a Node web service with npm start, or enable Firebase Email/Password authentication.');
+          }
           throw new Error(data.error || 'Failed to create account.');
         }
 
