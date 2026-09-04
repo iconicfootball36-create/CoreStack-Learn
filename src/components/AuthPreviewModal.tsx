@@ -41,7 +41,12 @@ export const AuthPreviewModal: React.FC<AuthModalProps> = ({ isOpen, mode: initi
       onClose();
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      setError(err.message || 'Google sign-in could not be completed.');
+      const errorCode = err?.code || '';
+      setError(
+        errorCode === 'auth/unauthorized-domain'
+          ? 'Google sign-in is not enabled for this hosted domain yet. Add core-stack-learn.vercel.app to Firebase Authorized Domains, then try again.'
+          : err.message || 'Google sign-in could not be completed.',
+      );
     } finally {
       setIsGoogleLoading(false);
     }
@@ -70,6 +75,20 @@ export const AuthPreviewModal: React.FC<AuthModalProps> = ({ isOpen, mode: initi
       if (onSuccess) onSuccess();
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      await login('alex.student@corestack.edu', 'learn123');
+      onClose();
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Demo login could not be completed.');
     } finally {
       setIsLoading(false);
     }
@@ -268,6 +287,22 @@ export const AuthPreviewModal: React.FC<AuthModalProps> = ({ isOpen, mode: initi
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        {mode === 'login' && (
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={isLoading || isGoogleLoading}
+              className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Use Demo Login
+            </button>
+            <p className="text-center text-[11px] text-slate-500">
+              Test account: alex.student@corestack.edu
+            </p>
+          </div>
+        )}
 
         {/* Security & Multi-tenant isolation disclaimer */}
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
