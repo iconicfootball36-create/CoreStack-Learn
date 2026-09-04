@@ -251,6 +251,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setIsLoading(false);
           throw new Error('Email/password sign-in is disabled in Firebase. Enable Email/Password under Firebase Console → Authentication → Sign-in method.');
         }
+        if (fbErr.code === 'auth/invalid-credential' || fbErr.code === 'auth/invalid-login-credentials' || fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/wrong-password') {
+          setIsLoading(false);
+          throw new Error('Incorrect email or password. For testing, use the Use Demo Login button or create this account in Firebase Authentication.');
+        }
       }
     }
 
@@ -317,7 +321,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(error.message || 'Demo login failed.');
       }
 
-      demoUser = (await createUserWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
+      try {
+        demoUser = (await createUserWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
+      } catch (createError: any) {
+        if (createError.code === 'auth/email-already-in-use') {
+          throw new Error('The demo account already exists with a different password. Reset it or create a Firebase user with email alex.student@corestack.edu and password learn123.');
+        }
+        throw new Error(createError.message || 'Demo account could not be created.');
+      }
       await updateFirebaseProfile(demoUser, { displayName: 'Abdulsalam' });
     }
 
