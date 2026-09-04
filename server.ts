@@ -34,7 +34,7 @@ function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunctio
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Support large document uploads (PDF text dumps, base64 data, etc.)
   app.use(express.json({ limit: '50mb' }));
