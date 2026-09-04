@@ -175,7 +175,7 @@ export const GroundedQuizStudio: React.FC<GroundedQuizStudioProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-blue-600 mb-1">
             <Sparkles className="w-4 h-4 text-blue-600" />
-            <span>PHASE 10: GROUNDED ASSESSMENT & KNOWLEDGE VERIFICATION</span>
+            <span>GROUNDED ASSESSMENT & KNOWLEDGE VERIFICATION</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
             Grounded Quiz Studio

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, BookOpen, Layers, Cpu, ArrowRight, ShieldCheck, User, LogOut, Flame } from 'lucide-react';
+import { ArrowRight, User, Menu, X } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
 
 interface NavbarProps {
@@ -9,8 +9,9 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, onEnterDashboard }) => {
-  const { user, isAuthenticated, logout, loginDemo } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, on
           : 'bg-white text-slate-900 border-b border-slate-200'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[4.5rem] flex items-center justify-between gap-3">
         {/* Brand Logo */}
         <div className="flex items-center gap-3">
           <a href="#" className="flex items-center gap-2.5 group">
@@ -38,8 +39,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, on
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 font-sans">CoreStack</span>
-                <span className="font-bold text-xl tracking-tight text-blue-600 font-sans">Learn</span>
+                <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 font-sans">CoreStack</span>
+                <span className="font-bold text-lg sm:text-xl tracking-tight text-blue-600 font-sans">Learn</span>
               </div>
             </div>
           </a>
@@ -56,14 +57,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, on
           <a href="#features" className="hover:text-blue-600 transition-colors">
             Features
           </a>
-          <a href="#architecture" className="hover:text-blue-600 transition-colors flex items-center gap-1.5">
-            <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            System Blueprint
-          </a>
         </nav>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3">
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <button
@@ -85,13 +82,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, on
           ) : (
             <div className="flex items-center gap-2 sm:gap-3">
               <button
-                onClick={() => loginDemo()}
-                className="hidden sm:inline-flex text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
-              >
-                Demo Student Login
-              </button>
-
-              <button
                 id="btn-nav-login"
                 onClick={() => onOpenAuth('login')}
                 className="text-xs sm:text-sm font-medium px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -110,7 +100,85 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenHowItWorks, on
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          className="md:hidden w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-700 flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileMenuOpen}
+        >
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
       </div>
+
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white shadow-lg">
+          <nav className="max-w-7xl mx-auto px-4 py-3 space-y-1 text-sm font-medium text-slate-700">
+            <a
+              href="#how-it-works"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-3 rounded-lg hover:bg-slate-50 hover:text-blue-600"
+            >
+              How It Works
+            </a>
+            <a
+              href="#pedagogical-loop"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-3 rounded-lg hover:bg-slate-50 hover:text-blue-600"
+            >
+              Cognitive Loop
+            </a>
+            <a
+              href="#features"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-3 rounded-lg hover:bg-slate-50 hover:text-blue-600"
+            >
+              Features
+            </a>
+
+            <div className="pt-2 mt-2 border-t border-slate-100">
+              {isAuthenticated && user ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onEnterDashboard?.();
+                  }}
+                  className="w-full px-3 py-3 rounded-lg bg-blue-600 text-white font-bold text-left flex items-center gap-2 cursor-pointer"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Open Student Workspace</span>
+                  <ArrowRight className="w-4 h-4 ml-auto" />
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAuth('login');
+                    }}
+                    className="px-3 py-3 rounded-lg border border-slate-200 text-slate-700 font-semibold cursor-pointer"
+                  >
+                    Log In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAuth('signup');
+                    }}
+                    className="px-3 py-3 rounded-lg bg-blue-600 text-white font-semibold cursor-pointer"
+                  >
+                    Start Learning
+                  </button>
+                </div>
+              )}
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   );
 };

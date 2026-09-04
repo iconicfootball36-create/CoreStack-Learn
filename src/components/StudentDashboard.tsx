@@ -717,7 +717,7 @@ export const StudentDashboard: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                    Phase 8 Diagnostic Engine
+                    Diagnostic Engine
                   </span>
                   <span className="text-xs text-slate-500 font-medium">4-Tier Cognitive Rubric</span>
                 </div>

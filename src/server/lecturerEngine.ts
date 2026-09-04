@@ -12,6 +12,7 @@ function getGeminiClient(): GoogleGenAI | null {
     geminiClient = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
       httpOptions: {
+        timeout: 20000,
         headers: {
           'User-Agent': 'aistudio-build',
         },
@@ -56,7 +57,6 @@ export interface LecturerResponse {
  */
 function retrieveRelevantChunks(chunks: DocumentChunk[], query: string, conceptName?: string): DocumentChunk[] {
   if (!chunks || chunks.length === 0) return [];
-  if (chunks.length <= 4) return chunks;
 
   const searchTerms = `${query} ${conceptName || ''}`.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
 
@@ -81,8 +81,12 @@ function retrieveRelevantChunks(chunks: DocumentChunk[], query: string, conceptN
 
   scored.sort((a, b) => b.score - a.score);
 
-  // Return top 3 chunks (or at least the first 3 if none matched)
-  return scored.slice(0, 3).map((s) => s.chunk);
+  const matchingChunks = scored.filter((item) => item.score > 0).slice(0, 3);
+  return matchingChunks.map((item) => item.chunk);
+}
+
+function isConversationalMessage(text: string): boolean {
+  return /^(hi|hello|hey|good morning|good afternoon|good evening|how are you|how's it going|who\s+(are|re)\s+you|what are you|can we talk|can we do another topic|can we discuss another topic|let's talk about something else|i want to change topic|change the topic|can i ask|may i ask|i have a question|do you understand|are you there|i'?m doing|doing great|hope you are|thanks|thank you)\b/i.test(text.trim());
 }
 
 /**
@@ -105,27 +109,32 @@ export async function generateLecturerResponse(req: LecturerRequest): Promise<Le
   if (ai) {
     try {
       const systemInstruction = `You are "Dr. CoreStack", a world-class, empathetic, highly rigorous AI Academic Personal Lecturer.
-Your mission is to guide the student to deep conceptual mastery using the provided lecture notes and textbook excerpts.
+Your mission is to answer the student's questions naturally and accurately, like a helpful general-purpose AI assistant. When the question relates to the uploaded material, use it to give a grounded answer and help the student learn.
 
 STUDENT PROFILE:
 - Name: ${user.name}
 - Academic Level: ${academicLevel} (Calibrate vocabulary, depth, and theoretical rigor accordingly)
 - Learning Pace: ${learningPace}
-- Current Course Material: "${material.title}"
+- Uploaded Material Available: "${material.title}"
 - Active Topic / Concept Focus: "${conceptName || 'General Course Scope'}"
 - Requested Pedagogical Strategy: "${strategy}"
 
 STRICT PEDAGOGICAL GROUNDING RULES:
-1. Ground your answer strictly in the provided Source Document Chunks. Never hallucinate facts outside the material.
-2. If the user asks for a specific strategy:
+1. Use the uploaded source chunks when they are relevant, but do not refuse general questions or claim that your expertise is limited to this material.
+2. For questions outside the uploaded material, answer normally using your general knowledge. Be honest when you are uncertain.
+3. If the user asks for a specific strategy:
    - "SIMPLE_EXPLANATION": Explain using first-principles intuition, clear everyday vocabulary, and zero superfluous jargon.
    - "REAL_WORLD_ANALOGY": Craft a vivid, memorable, mechanically accurate physical or real-world analogy.
    - "STEP_BY_STEP": Structure the explanation into sequentially numbered, logical execution phases with inputs, transitions, and outputs.
    - "QUESTION_LED": Do not just dump the answer. Ask an incisive question that leads the student to discover the principle themselves.
    - "ACADEMIC_DEEP_DIVE": Provide formal mathematical definitions, hardware/system trade-offs, edge cases, and algorithmic complexity.
    - "PRACTICAL_EXAMPLE": Provide a clear concrete numerical trace or pseudo-code scenario.
-3. Always include 1 targeted follow-up formative question to verify the student's active comprehension.
-4. Format your main response in elegant, readable Markdown with bold terminology, bullet points, and code/formulas where relevant.`;
+4. Only include a follow-up learning question when it helps; do not append one to casual conversation or ordinary direct questions.
+5. Format your main response in clear, readable Markdown with bold terminology, bullet points, and code/formulas where relevant.`;
+
+      const conversationGuidance = isConversationalMessage(studentInput)
+        ? '\nThe student is making casual conversation. Respond warmly and naturally, like a normal AI assistant. Do not force a lesson, analogy, quiz, or course-material summary. Keep the reply concise and do not ask a diagnostic question.\n'
+        : '';
 
       const formattedHistory = conversationHistory.slice(-6).map((h) => ({
         role: h.role === 'user' ? ('user' as const) : ('model' as const),
@@ -140,10 +149,10 @@ STUDENT'S QUERY / RESPONSE:
 
 ACTIVE STRATEGY: ${strategy}
 
-Respond with JSON adhering to the specified schema.`;
+Respond with JSON adhering to the specified schema.${conversationGuidance}`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.6-flash',
         contents: [
           ...formattedHistory,
           {
@@ -241,6 +250,37 @@ function generateDeterministicLecturerResponse(params: {
   let followUpQuestion = '';
   let suggestedActions = ['Explain with an analogy', 'Break it down step-by-step', 'Give me a quiz question'];
 
+  if (isConversationalMessage(studentInput)) {
+    const normalizedInput = studentInput.trim().toLowerCase();
+    const reply = normalizedInput.startsWith('thank')
+      ? 'You are welcome. What would you like to explore?'
+      : normalizedInput.startsWith('how are you') || normalizedInput.startsWith("how's it going")
+      ? 'I am doing well and ready to help. What would you like to talk about?'
+      : normalizedInput.startsWith("i'm doing") || normalizedInput.startsWith('im doing') || normalizedInput.startsWith('doing great')
+      ? 'That is good to hear. What would you like to explore?'
+      : normalizedInput.startsWith('hope you are')
+      ? 'I am doing well and ready to help. What would you like to explore?'
+      : /^(who\s+(are|re)\s+you|what are you)/i.test(normalizedInput)
+      ? 'I am Dr. CoreStack, your AI learning assistant. I can explain your uploaded material, answer general questions, and work through ideas with you step by step.'
+      : normalizedInput.startsWith('can we talk')
+      ? 'Of course. We can talk about anything you would like. What is on your mind?'
+      : normalizedInput.startsWith('can we do another topic') || normalizedInput.startsWith('can we discuss another topic') || normalizedInput.startsWith("let's talk about something else") || normalizedInput.startsWith('i want to change topic') || normalizedInput.startsWith('change the topic')
+      ? 'Of course. What topic would you like to explore next?'
+      : normalizedInput.startsWith('do you understand')
+      ? 'Yes, I understand you. You can ask me about your uploaded material or any other subject, and I will do my best to help.'
+      : 'Of course. What would you like to talk about?';
+
+    return {
+      reply,
+      strategyUsed: 'DEFAULT' as TeachingStrategy,
+      pedagogicalIntent: 'Natural conversational response to the student.',
+      groundedSources: [],
+      followUpQuestion: '',
+      suggestedActions: [],
+      comprehensionScoreEstimate: 0,
+    };
+  }
+
   switch (strategy) {
     case 'SIMPLE_EXPLANATION':
       pedagogicalIntent = 'Deconstructed into first-principles intuition without heavy jargon.';
@@ -294,11 +334,14 @@ function generateDeterministicLecturerResponse(params: {
       break;
 
     default:
-      pedagogicalIntent = 'Comprehensive grounded lesson overview tailored to student academic level.';
-      reply = `Welcome to our session on **${targetTopic}** from "*${material.title}*".\n\n` +
-        `${primaryChunk.content}\n\n` +
-        `We can explore this concept from multiple angles: we can trace its internal mechanics step-by-step, use real-world analogies, or test your comprehension with a quick diagnostic question.`;
-      followUpQuestion = `Which aspect of ${targetTopic} would you like to explore first?`;
+      pedagogicalIntent = relevantChunks.length > 0
+        ? 'Direct answer grounded in the uploaded material.'
+        : 'Natural conversational response.';
+      reply = relevantChunks.length > 0
+        ? `Based on your uploaded material, **${targetTopic}** is described as follows:\n\n${primaryChunk.content}`
+        : `I could not reach the live AI service just now, so I cannot give a reliable answer to that question yet. Please try again in a moment.`;
+      followUpQuestion = relevantChunks.length > 0 ? `Would you like me to clarify any part of this answer?` : '';
+      suggestedActions = relevantChunks.length > 0 ? suggestedActions : [];
       break;
   }
 

@@ -111,10 +111,12 @@ export function prepareTextForSpeech(markdown: string): string {
     .replace(/_([^_]+)_/g, '$1')
     // Remove blockquote tokens
     .replace(/^>\s+/gm, '')
-    // Replace bullet points with brief pauses
-    .replace(/^[-*+]\s+/gm, 'Next point: ')
-    // Replace numbered lists (1. , 2. ) with "Point 1", etc.
-    .replace(/^(\d+)\.\s+/gm, 'Point $1: ')
+    // Remove list markers so markdown syntax is not narrated
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/\(\d+\)\s+/g, '')
+    // Keep course code 101 as three spoken digits instead of a number word
+    .replace(/\b101\b/g, '1 0 1')
     // Remove horizontal rules
     .replace(/^-{3,}$/gm, '')
     // Replace emoji or special non-spoken symbols

@@ -18,20 +18,20 @@ export const Hero: React.FC<HeroProps> = ({ onStartLearning, onSeeHowItWorks }) 
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold uppercase tracking-wider mb-6">
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>AI Personal Lecturer • Not a Simple Chatbot</span>
+            <span>AI Personal Lecturer • Built for Understanding</span>
           </div>
 
           {/* Primary Positioning Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 font-sans leading-[1.1] mb-6">
-            Learn Until You{' '}
+            Learn until it{' '}
             <span className="text-blue-600">
-              Understand.
+              clicks.
             </span>
           </h1>
 
           {/* Supporting Message */}
           <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-normal mb-10 max-w-2xl mx-auto">
-            Upload your study materials and get a personal AI lecturer that teaches at your pace, checks your understanding, and helps you master every topic.
+            Upload your notes, slides, and readings. Your AI lecturer teaches at your pace, checks what you actually understand, and explains things again until they finally stick.
           </p>
 
           {/* Action CTAs */}
@@ -41,7 +41,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartLearning, onSeeHowItWorks }) 
               onClick={onStartLearning}
               className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900 text-white font-bold text-base hover:bg-slate-800 shadow-md shadow-slate-900/10 hover:shadow-slate-900/20 transition-all flex items-center justify-center gap-2 group cursor-pointer"
             >
-              <span>Get Started Free</span>
+              <span>Start Learning</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
 
@@ -51,7 +51,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartLearning, onSeeHowItWorks }) 
               className="w-full sm:w-auto px-7 py-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-base border border-slate-200 shadow-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer"
             >
               <PlayCircle className="w-4 h-4 text-blue-600" />
-              <span>See How It Works</span>
+              <span>How It Works</span>
             </button>
           </div>
 

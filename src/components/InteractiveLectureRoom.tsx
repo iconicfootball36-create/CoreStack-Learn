@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Volume2,
   VolumeX,
+  Trash2,
   Play,
   Pause,
   Square,
@@ -42,7 +43,7 @@ interface MessageItem {
   id: string;
   sender: 'student' | 'lecturer' | 'system';
   text: string;
-  strategy?: TeachingStrategy;
+  strategy?: TeachingStrategy | 'DEFAULT';
   pedagogicalIntent?: string;
   groundedSources?: GroundedSource[];
   followUpQuestion?: string;
@@ -73,11 +74,14 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
   const [activeConcept, setActiveConcept] = useState<string>(
     initialConcept || material?.title || 'Core Foundations'
   );
+  const [curriculumTopics, setCurriculumTopics] = useState<Topic[]>([]);
+  const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
   const [activeStrategy, setActiveStrategy] = useState<TeachingStrategy>(
     user?.preferredStrategy || 'REAL_WORLD_ANALOGY'
   );
 
   const [inputMessage, setInputMessage] = useState('');
+  const [sendError, setSendError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedSourceModal, setSelectedSourceModal] = useState<GroundedSource | null>(null);
   
@@ -91,8 +95,11 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
   const voiceEngine = useLecturerVoice();
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const pendingRequestsRef = useRef(0);
+  const chatHydratedRef = useRef(false);
 
-  // Initial welcome message
+  const chatStorageKey = material && user ? `csl_chat_${user.id}_${material.id}` : null;
+
   const [messages, setMessages] = useState<MessageItem[]>(() => {
     const matTitle = material?.title || 'Distributed Systems & Operating Internals';
     return [
@@ -108,15 +115,51 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
         ],
         time: 'Just now',
       },
-      {
-        id: 'msg_init_2',
-        sender: 'lecturer',
-        text: `To calibrate our starting point on **${activeConcept}**:\n\nIn your own words, what is the fundamental problem or trade-off that **${activeConcept}** is designed to solve in this system?`,
-        followUpQuestion: `What is the primary guarantee of ${activeConcept}?`,
-        time: 'Just now',
-      },
     ];
   });
+
+  useEffect(() => {
+    if (!material?.id) return;
+    chatHydratedRef.current = false;
+    setCurriculumTopics([]);
+    setCurrentTopicIndex(0);
+    setActiveConcept(initialConcept || material.title || 'General Conversation');
+    setSendError('');
+    setMessages([
+      {
+        id: `msg_init_${material.id}`,
+        sender: 'lecturer',
+        text: `We are now working with **${material.title}**. Ask me anything about it, or ask a general question and I will help.`,
+        time: 'Just now',
+      },
+    ]);
+  }, [material?.id]);
+
+  useEffect(() => {
+    if (!chatStorageKey) return;
+    const savedMessages = localStorage.getItem(chatStorageKey);
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages) as MessageItem[]);
+      } catch {
+        localStorage.removeItem(chatStorageKey);
+      }
+    }
+    chatHydratedRef.current = true;
+  }, [chatStorageKey]);
+
+  useEffect(() => {
+    if (chatStorageKey && chatHydratedRef.current) {
+      localStorage.setItem(chatStorageKey, JSON.stringify(messages));
+    }
+  }, [chatStorageKey, messages]);
+
+  const handleClearChat = () => {
+    if (!chatStorageKey) return;
+    localStorage.removeItem(chatStorageKey);
+    setMessages([]);
+    setSendError('');
+  };
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -130,12 +173,21 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
     }
   }, [initialConcept]);
 
-  const handleSendMessage = async (textToSend?: string, strategyOverride?: TeachingStrategy) => {
+  const handleSendMessage = async (
+    textToSend?: string,
+    strategyOverride?: TeachingStrategy,
+    conceptOverride?: string,
+  ) => {
     const text = textToSend || inputMessage.trim();
-    if (!text || isGenerating || !material || !token) return;
+    if (!text) return;
+    if (!token) {
+      setSendError('Your session is not ready. Please sign in again, then retry.');
+      return;
+    }
 
     setInputMessage('');
-    const effectiveStrategy = strategyOverride || activeStrategy;
+    setSendError('');
+    const effectiveStrategy = strategyOverride || (textToSend ? activeStrategy : undefined);
 
     const userMessage: MessageItem = {
       id: `msg_stu_${Date.now()}`,
@@ -145,6 +197,7 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    pendingRequestsRef.current += 1;
     setIsGenerating(true);
 
     try {
@@ -164,15 +217,18 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          materialId: material.id,
+          materialId: material?.id,
           message: text,
           strategy: effectiveStrategy,
-          conceptName: activeConcept,
+          conceptName: conceptOverride || activeConcept,
           conversationHistory: history,
         }),
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('Your session has expired. Please sign in again.');
+        }
         throw new Error(`Lecturer returned ${res.status}`);
       }
 
@@ -199,6 +255,7 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
       }
     } catch (err: any) {
       console.error('Lecturer dialogue error:', err);
+      setSendError(err.message || 'The lecturer could not respond. Please try again.');
       // Fallback local message
       setMessages((prev) => [
         ...prev,
@@ -212,8 +269,59 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
         },
       ]);
     } finally {
-      setIsGenerating(false);
+      pendingRequestsRef.current = Math.max(0, pendingRequestsRef.current - 1);
+      setIsGenerating(pendingRequestsRef.current > 0);
     }
+  };
+
+  useEffect(() => {
+    if (!material || !token) return;
+    let cancelled = false;
+
+    const startCurriculumLesson = async () => {
+      try {
+        const response = await fetch(`/api/student/materials/${material.id}/details`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+
+        const details = await response.json();
+        const topics = (details.topics || []) as Topic[];
+        if (cancelled || topics.length === 0) return;
+
+        const firstTopic = topics[0];
+        setCurriculumTopics(topics);
+        setCurrentTopicIndex(0);
+        setActiveConcept(firstTopic.title);
+        setMessages((previous) => previous.slice(0, 1));
+
+        await handleSendMessage(
+          `Teach me the topic "${firstTopic.title}" from my uploaded material. Start with a clear explanation, cover its key ideas and examples, then ask one short question to check my understanding. Do not begin with a question.`,
+          undefined,
+          firstTopic.title,
+        );
+      } catch (error) {
+        console.error('Failed to load the material curriculum:', error);
+      }
+    };
+
+    void startCurriculumLesson();
+    return () => {
+      cancelled = true;
+    };
+  }, [material?.id, token]);
+
+  const handleTeachNextTopic = () => {
+    const nextTopic = curriculumTopics[currentTopicIndex + 1];
+    if (!nextTopic || isGenerating) return;
+
+    setCurrentTopicIndex((index) => index + 1);
+    setActiveConcept(nextTopic.title);
+    void handleSendMessage(
+      `Teach me the topic "${nextTopic.title}" from my uploaded material. Explain the main ideas clearly, connect them to what came before, and ask one short question to check my understanding. Do not begin with a question.`,
+      undefined,
+      nextTopic.title,
+    );
   };
 
   const handleStrategyChange = (newStrategy: TeachingStrategy, promptTitle: string) => {
@@ -415,7 +523,21 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
         />
 
         {/* Conversation Stream */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5 max-h-[580px] overflow-y-auto">
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 sm:px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Conversation</span>
+            <button
+              type="button"
+              onClick={handleClearChat}
+              disabled={!chatStorageKey || messages.length === 0}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Delete this saved chat"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Chat</span>
+            </button>
+          </div>
+          <div className="p-5 sm:p-6 space-y-5 max-h-[580px] overflow-y-auto">
           {messages.map((msg) => {
             const isThisMsgSpeaking = voiceEngine.isSpeaking && voiceEngine.activeMessageId === msg.id;
 
@@ -425,7 +547,7 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
                 className={`flex flex-col ${msg.sender === 'student' ? 'items-end' : 'items-start'}`}
               >
                 {/* Intent / Grounding Badge */}
-                {msg.pedagogicalIntent && (
+                {msg.pedagogicalIntent && msg.strategy !== 'DEFAULT' && (
                   <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 mb-1.5 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
                     <Sparkles className="w-3 h-3 text-blue-600" />
                     <span>Pedagogical Intent: {msg.pedagogicalIntent}</span>
@@ -454,7 +576,7 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
                         <span className="text-[11px] font-bold text-slate-800">
                           {voiceEngine.selectedPersona.name}
                         </span>
-                        {msg.strategy && (
+                        {msg.strategy && msg.strategy !== 'DEFAULT' && (
                           <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-blue-100/70 text-blue-700">
                             {msg.strategy.replace(/_/g, ' ')}
                           </span>
@@ -567,10 +689,17 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
           )}
 
           <div ref={chatEndRef} />
+          </div>
         </div>
 
         {/* Input Bar */}
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2.5">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSendMessage();
+          }}
+          className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2.5"
+        >
           <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-1">
             <span className="flex items-center gap-1.5">
               <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
@@ -591,14 +720,14 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
                   handleSendMessage();
                 }
               }}
-              disabled={isGenerating || isEvaluatingDiagnostic}
+              disabled={isEvaluatingDiagnostic}
               className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all resize-none"
             />
 
             <div className="flex flex-col gap-1.5 shrink-0">
               <button
-                onClick={() => handleSendMessage()}
-                disabled={!inputMessage.trim() || isGenerating || isEvaluatingDiagnostic}
+                type="submit"
+                disabled={!inputMessage.trim() || isEvaluatingDiagnostic}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 title="Send message to Dr. CoreStack"
               >
@@ -625,7 +754,8 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
               </button>
             </div>
           </div>
-        </div>
+          {sendError && <p className="text-xs text-rose-600 px-1">{sendError}</p>}
+        </form>
       </div>
 
       {/* Right Column: Dynamic Pedagogical Controls & Course Focus (4 Cols) */}
@@ -668,6 +798,23 @@ export const InteractiveLectureRoom: React.FC<InteractiveLectureRoomProps> = ({
               className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-600"
             />
           </div>
+
+          {curriculumTopics.length > 0 && (
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>Topic {currentTopicIndex + 1} of {curriculumTopics.length}</span>
+                <span className="font-semibold text-blue-600">Curriculum lesson</span>
+              </div>
+              <button
+                onClick={handleTeachNextTopic}
+                disabled={currentTopicIndex >= curriculumTopics.length - 1 || isGenerating}
+                className="w-full px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{currentTopicIndex >= curriculumTopics.length - 1 ? 'All Topics Covered' : 'Teach Next Topic'}</span>
+                {currentTopicIndex < curriculumTopics.length - 1 && <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Socratic Formative Diagnostic Action & Summary Card */}

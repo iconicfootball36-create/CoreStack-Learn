@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -16,23 +17,15 @@ interface AuthenticatedRequest extends Request {
 // Authentication middleware
 function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
 
   if (!token || token === 'null' || token === 'undefined') {
-    token = 'csl_tok_demo_active_student';
+    return res.status(401).json({ error: 'Authentication required. Please log in.' });
   }
 
   const user = AuthStore.getUserByToken(token);
-
   if (user) {
     req.user = user;
-    return next();
-  }
-
-  // Fallback: Ensure demo student session is returned rather than breaking student uploads
-  const demoStudent = AuthStore.getDemoStudent();
-  if (demoStudent) {
-    req.user = demoStudent.user;
     return next();
   }
 
@@ -104,15 +97,6 @@ async function startServer() {
       res.json(result);
     } catch (err: any) {
       res.status(401).json({ error: err.message || 'Invalid credentials.' });
-    }
-  });
-
-  app.post('/api/auth/demo', (req, res) => {
-    try {
-      const result = AuthStore.loginDemoUser();
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to initialize demo session.' });
     }
   });
 
@@ -289,24 +273,35 @@ async function startServer() {
   app.post('/api/lecturer/message', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { materialId, message, strategy, conceptName, conversationHistory } = req.body;
-      if (!materialId || !message) {
-        return res.status(400).json({ error: 'materialId and message are required.' });
+      if (!message) {
+        return res.status(400).json({ error: 'message is required.' });
       }
 
       // 1. Fetch user's isolated material
       const userMaterials = AuthStore.getUserMaterials(req.user.id);
-      const material = userMaterials.find((m) => m.id === materialId);
-      if (!material) {
+      const material = materialId ? userMaterials.find((m) => m.id === materialId) : undefined;
+      if (materialId && !material) {
         return res.status(404).json({ error: 'Study material not found in your account.' });
       }
 
       // 2. Fetch associated document chunks
-      const chunks = AuthStore.getMaterialChunks(materialId);
+      const chatMaterial = material || {
+        id: 'general-chat',
+        userId: req.user.id,
+        title: 'General Conversation',
+        originalFileName: '',
+        fileType: 'txt' as const,
+        fileSize: 0,
+        processingStatus: 'READY' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const chunks = material ? AuthStore.getMaterialChunks(material.id) : [];
 
       // 3. Generate adaptive pedagogical response via Gemini 3.7 Flash or Deterministic Engine
       const lecturerResponse = await generateLecturerResponse({
         user: req.user,
-        material,
+        material: chatMaterial,
         chunks,
         conceptName,
         strategy: strategy || 'DEFAULT',

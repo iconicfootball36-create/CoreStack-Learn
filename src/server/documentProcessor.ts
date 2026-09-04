@@ -235,13 +235,17 @@ Generate a structured curriculum in JSON format with:
           id: courseId,
           userId: material.userId,
           materialId: material.id,
-          title: parsed.courseTitle || material.title,
+          title: normalizeCourseTitle(parsed.courseTitle || material.title),
           description: parsed.description || material.summary || 'Structured interactive course curriculum.',
           subject: parsed.subject || 'Academic Studies',
           recommendedOrder: 1,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
+
+        function normalizeCourseTitle(title: string): string {
+          return title.replace(/\bone\s+hundred\s+and\s+one\b/gi, '101');
+        }
 
         const topics: Topic[] = [];
         const allConcepts: Concept[] = [];
@@ -433,8 +437,8 @@ The ARIES recovery algorithm operates in three phases during crash recovery: Ana
 
 ## 3. Strict Two-Phase Locking (Strict 2PL)
 Strict 2PL guarantees serializable isolation and prevents cascading aborts by enforcing two rules:
-- **Phase 1 (Growing)**: A transaction acquires shared (S) locks for reads and exclusive (X) locks for writes. No locks can be released while in the growing phase.
-- **Phase 2 (Shrinking)**: All locks are held until the very end of the transaction (Commit or Abort).
+- **Growing**: A transaction acquires shared (S) locks for reads and exclusive (X) locks for writes. No locks can be released while in the growing phase.
+- **Shrinking**: All locks are held until the very end of the transaction (Commit or Abort).
 
 ## 4. Multi-Version Concurrency Control (MVCC)
 In MVCC, readers never block writers, and writers never block readers.

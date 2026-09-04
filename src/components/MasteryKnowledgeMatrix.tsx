@@ -126,7 +126,7 @@ export const MasteryKnowledgeMatrix: React.FC<MasteryKnowledgeMatrixProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-blue-600 mb-1">
             <Sparkles className="w-4 h-4 text-blue-600" />
-            <span>PHASE 11: MASTERY KNOWLEDGE MATRIX & WEAKNESS REMEDIATION</span>
+            <span>MASTERY KNOWLEDGE MATRIX & WEAKNESS REMEDIATION</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
             Mastery Knowledge Matrix

@@ -141,7 +141,7 @@ export const ArchitectureViewer: React.FC = () => {
         <div className="text-center max-w-3xl mx-auto mb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold uppercase tracking-wider mb-4">
             <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            <span>System Architecture & 12-Phase Roadmap</span>
+            <span>System Overview & Product Roadmap</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Engineering a Scalable EdTech Foundation
@@ -154,7 +154,7 @@ export const ArchitectureViewer: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
-            { id: 'roadmap', label: '12-Phase MVP Roadmap', icon: Layers },
+            { id: 'roadmap', label: 'Product Roadmap', icon: Layers },
             { id: 'database', label: 'Database Schema (Prisma)', icon: Database },
             { id: 'ai', label: 'AI Provider Layer', icon: Sparkles },
             { id: 'api', label: 'Live Server Status', icon: Activity },
@@ -203,7 +203,7 @@ export const ArchitectureViewer: React.FC = () => {
                           : 'bg-slate-100 text-slate-500 border border-slate-200'
                       }`}
                     >
-                      {p.status === 'COMPLETED' ? '✓ Phase 1 Completed' : p.status === 'READY_NEXT' ? '→ Next Up' : 'Planned'}
+                      {p.status === 'COMPLETED' ? '✓ Completed' : p.status === 'READY_NEXT' ? '→ Next Up' : 'Planned'}
                     </span>
                   </div>
 

@@ -22,7 +22,7 @@ export const Footer: React.FC<FooterProps> = ({ onStartLearning, onOpenHowItWork
           </h2>
 
           <p className="text-base sm:text-lg text-slate-400 max-w-xl mx-auto">
-            Stop passively skimming through slides. Upload your materials and start learning until you truly master every single concept.
+            Stop skimming and start learning in a way that actually checks understanding. Upload your material and build real mastery, one concept at a time.
           </p>
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -60,7 +60,7 @@ export const Footer: React.FC<FooterProps> = ({ onStartLearning, onOpenHowItWork
             </p>
             <div className="text-[11px] text-slate-400 flex items-center gap-2 pt-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Phase 1 Foundation Operational • Production Architecture</span>
+              <span>Production architecture foundation · Ready for deep learning</span>
             </div>
           </div>
 

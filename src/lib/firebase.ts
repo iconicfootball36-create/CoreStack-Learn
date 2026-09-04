@@ -24,17 +24,48 @@ import {
   onSnapshot,
   Firestore,
 } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfigFile from '../../firebase-applet-config.json';
 
-// Initialize Firebase App
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const mergedFirebaseConfig = {
+  ...firebaseConfigFile,
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) || firebaseConfigFile.apiKey,
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) || firebaseConfigFile.authDomain,
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) || firebaseConfigFile.projectId,
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) || firebaseConfigFile.storageBucket,
+  messagingSenderId:
+    (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) || firebaseConfigFile.messagingSenderId,
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) || firebaseConfigFile.appId,
+  measurementId: (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string | undefined) || firebaseConfigFile.measurementId,
+};
 
-// CRITICAL: Initialize Firestore with explicit database ID
-export const db: Firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const hasFirebaseCoreConfig = Boolean(
+  mergedFirebaseConfig.apiKey &&
+    mergedFirebaseConfig.authDomain &&
+    mergedFirebaseConfig.projectId &&
+    mergedFirebaseConfig.appId
+);
+
+const app = hasFirebaseCoreConfig ? (!getApps().length ? initializeApp(mergedFirebaseConfig) : getApp()) : null;
+
+const databaseId = typeof (mergedFirebaseConfig as any).firestoreDatabaseId === 'string'
+  ? (mergedFirebaseConfig as any).firestoreDatabaseId
+  : '';
+
+const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const isLocalDevHost = ['localhost', '127.0.0.1', '[::1]'].includes(currentHostname) || currentHostname.endsWith('.localhost');
 
 // Initialize Firebase Auth
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+export const auth = app ? getAuth(app) : null;
+
+export const isFirebaseEnabled = Boolean(app);
+export const isGoogleAuthEnabled = Boolean(
+  app &&
+    auth &&
+    (!isLocalDevHost || (mergedFirebaseConfig.authDomain || '').toLowerCase().includes('localhost'))
+);
+export const db: Firestore | null = app ? (databaseId ? getFirestore(app, databaseId) : getFirestore(app)) : null;
+
+export const googleProvider = isGoogleAuthEnabled ? new GoogleAuthProvider() : null;
 export {
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -75,13 +106,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
       providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
+        auth?.currentUser?.providerData?.map((provider) => ({
           providerId: provider.providerId,
           email: provider.email,
         })) || [],
@@ -95,13 +126,23 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Test connection on startup
 export async function testFirestoreConnection(): Promise<boolean> {
+  if (!db) {
+    return false;
+  }
+
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client appears offline or connecting.');
+    const message = error instanceof Error ? error.message : String(error);
+    if (/offline|permission|unauthorized|insufficient permissions/i.test(message)) {
+      return false;
     }
+
+    if (/the client is offline/i.test(message)) {
+      return false;
+    }
+
     return false;
   }
 }

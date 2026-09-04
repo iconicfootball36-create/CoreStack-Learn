@@ -101,27 +101,21 @@ export const HowItWorks: React.FC = () => {
             <span>The Cognitive Methodology</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            How CoreStack Learn Works
+            How it works
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-3">
-            A continuous loop engineered to transform raw study notes into deep, verified understanding.
+            Learn in a loop that starts with your material, tests your understanding, and keeps adjusting until the idea is truly clear.
           </p>
 
           {/* Quick Flow Ribbon */}
           <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 p-2 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-700 shadow-sm">
             <span className="text-blue-600 font-bold">Upload</span>
             <span className="text-slate-400">→</span>
-            <span>Understand</span>
-            <span className="text-slate-400">→</span>
-            <span>Plan</span>
-            <span className="text-slate-400">→</span>
-            <span>Teach</span>
+            <span>Learn</span>
             <span className="text-slate-400">→</span>
             <span>Check</span>
             <span className="text-slate-400">→</span>
-            <span className="text-rose-600 font-medium">Re-teach</span>
-            <span className="text-slate-400">→</span>
-            <span>Practice</span>
+            <span>Re-teach</span>
             <span className="text-slate-400">→</span>
             <span className="text-emerald-600 font-bold">Master</span>
           </div>

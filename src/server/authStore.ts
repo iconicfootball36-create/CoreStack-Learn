@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { User, StudyMaterial, DocumentChunk, Course, Topic, Concept, MasteryProgress, AcademicLevel, LearningPace, TeachingStrategy } from '../types/database';
 import { semanticChunkDocument, generateCourseCurriculum, CURATED_ACADEMIC_PACKS } from './documentProcessor';
 import { FormativeDiagnosticResult } from './diagnosticEngine';
@@ -18,6 +20,35 @@ const materialCourses = new Map<string, { course: Course; topics: Topic[]; conce
 const userMastery = new Map<string, MasteryProgress[]>();
 const userDiagnostics = new Map<string, FormativeDiagnosticResult[]>();
 const userQuizReports = new Map<string, QuizEvaluationReport[]>();
+const sessionFile = path.join(process.cwd(), '.sessions.json');
+
+function persistSessions() {
+  const entries = Array.from(sessions.entries()).map(([token, session]) => [token, {
+    ...session,
+    createdAt: session.createdAt.toISOString(),
+    expiresAt: session.expiresAt.toISOString(),
+  }]);
+  fs.writeFileSync(sessionFile, JSON.stringify(entries), 'utf8');
+}
+
+function restoreSessions() {
+  if (!fs.existsSync(sessionFile)) return;
+  try {
+    const entries = JSON.parse(fs.readFileSync(sessionFile, 'utf8')) as [string, { userId: string; createdAt: string; expiresAt: string }][];
+    for (const [token, session] of entries) {
+      if (new Date(session.expiresAt) >= new Date() && users.has(session.userId)) {
+        sessions.set(token, {
+          userId: session.userId,
+          createdAt: new Date(session.createdAt),
+          expiresAt: new Date(session.expiresAt),
+        });
+      }
+    }
+    persistSessions();
+  } catch {
+    // Ignore an invalid local session cache and require a fresh login.
+  }
+}
 
 // Hash password with salt
 function hashPassword(password: string, salt: string): string {
@@ -34,7 +65,7 @@ function seedInitialData() {
 
   const demoUser: StoredUser = {
     id: demoUserId,
-    name: 'Alex Rivera',
+    name: 'Abdulsalam',
     email: 'alex.student@corestack.edu',
     passwordHash,
     salt,
@@ -147,7 +178,7 @@ function seedInitialData() {
     materialCourses.set(matId, { course, topics, concepts });
   }
 
-  userMaterials.set(demoUserId, seededMaterials);
+  userMaterials.set(demoUserId, []);
 
   // Seed sample mastery progress
   const sampleMastery: MasteryProgress[] = [
@@ -194,6 +225,7 @@ function seedInitialData() {
 
 // Initialize seed
 seedInitialData();
+restoreSessions();
 
 export const AuthStore = {
   // Register a new student
@@ -248,6 +280,7 @@ export const AuthStore = {
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000), // 30 days
     });
+    persistSessions();
 
     const { passwordHash: _, salt: __, ...safeUser } = newUser;
     return { user: safeUser, token };
@@ -311,6 +344,7 @@ export const AuthStore = {
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
     });
+    persistSessions();
 
     const { passwordHash: _, salt: __, ...safeUser } = storedUser;
     return { user: safeUser, token };
@@ -337,45 +371,18 @@ export const AuthStore = {
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
     });
+    persistSessions();
 
     const { passwordHash: _, salt: __, ...safeUser } = storedUser;
     return { user: safeUser, token };
   },
 
-  // Quick Demo Login
-  loginDemoUser(): { user: User; token: string } {
-    seedInitialData();
-    const demoUser = users.get('alex.student@corestack.edu') || users.get('usr_demo_student_01') || Array.from(users.values())[0];
-    if (!demoUser) throw new Error('Demo student not found');
-
-    const token = `csl_tok_${crypto.randomBytes(24).toString('hex')}`;
-    sessions.set(token, {
-      userId: demoUser.id,
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
-    });
-
-    const { passwordHash: _, salt: __, ...safeUser } = demoUser;
-    return { user: safeUser, token };
-  },
-
-  getDemoStudent(): { user: User; token: string } {
-    return this.loginDemoUser();
-  },
-
   // Verify Token & Get User
   getUserByToken(token: string): User | null {
-    seedInitialData();
     if (!token || token === 'null' || token === 'undefined') {
-      const demoUser = users.get('usr_demo_student_01') || users.get('alex.student@corestack.edu') || Array.from(users.values())[0];
-      if (demoUser) {
-        const { passwordHash: _, salt: __, ...safeUser } = demoUser;
-        return safeUser;
-      }
       return null;
     }
 
-    // Check active in-memory session
     const session = sessions.get(token);
     if (session) {
       if (session.expiresAt >= new Date()) {
@@ -386,21 +393,8 @@ export const AuthStore = {
         }
       } else {
         sessions.delete(token);
+        persistSessions();
       }
-    }
-
-    // Resilience Fallback: If session map was reset due to hot-reload / dev restart,
-    // recover the demo student session or active user seamlessly
-    const fallbackUser = users.get('usr_demo_student_01') || users.get('alex.student@corestack.edu') || Array.from(users.values())[0];
-    if (fallbackUser) {
-      // Re-establish session
-      sessions.set(token, {
-        userId: fallbackUser.id,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
-      });
-      const { passwordHash: _, salt: __, ...safeUser } = fallbackUser;
-      return safeUser;
     }
 
     return null;
@@ -431,7 +425,9 @@ export const AuthStore = {
 
   // Revoke session token
   logout(token: string): boolean {
-    return sessions.delete(token);
+    const removed = sessions.delete(token);
+    persistSessions();
+    return removed;
   },
 
   // Get student's isolated materials

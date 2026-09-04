@@ -169,6 +169,20 @@ export const LecturerVoiceControlBar: React.FC<LecturerVoiceControlBarProps> = (
             />
           </button>
 
+          {/* Voice input preview */}
+          <button
+            type="button"
+            disabled
+            className="relative px-2.5 py-1.5 rounded-xl bg-slate-800/70 text-slate-500 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed"
+            title="Voice conversations are coming soon"
+          >
+            <Mic className="w-3 h-3" />
+            <span className="hidden sm:inline">Talk to AI</span>
+            <span className="absolute -top-2 -right-1 px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[8px] font-extrabold uppercase tracking-wide">
+              Soon
+            </span>
+          </button>
+
           {/* Voice Selector button */}
           <button
             onClick={() => setShowVoiceModal(true)}

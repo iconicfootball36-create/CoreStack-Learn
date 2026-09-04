@@ -4,6 +4,8 @@ import {
   auth,
   db,
   googleProvider,
+  isFirebaseEnabled,
+  isGoogleAuthEnabled,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -35,7 +37,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (params: RegisterParams) => Promise<void>;
-  loginDemo: () => Promise<void>;
   logout: () => void;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -54,6 +55,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Sync Firebase User with Firestore Profile and Server Session
   const syncFirebaseProfile = async (fbUser: FirebaseUser, overrides?: Partial<User>) => {
+    if (!db) {
+      setUser(overrides as User || user || null);
+      return;
+    }
+
     try {
       const userRef = doc(db, 'users', fbUser.uid);
       let firestoreData: any = null;
@@ -120,45 +126,64 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Listen for Firebase Auth State Changes
   useEffect(() => {
+    const initializeSession = async () => {
+      const persistedToken = localStorage.getItem(TOKEN_KEY);
+
+      if (persistedToken) {
+        setToken(persistedToken);
+        setIsLoading(true);
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${persistedToken}` },
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data.user);
+            setToken(persistedToken);
+          } else {
+            localStorage.removeItem(TOKEN_KEY);
+            setUser(null);
+            setToken(null);
+          }
+        } catch (err) {
+          console.warn('Could not restore session:', err);
+          localStorage.removeItem(TOKEN_KEY);
+          setUser(null);
+          setToken(null);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setUser(null);
+        setToken(null);
+        setFirebaseUser(null);
+        setIsCloudSynced(false);
+        setIsLoading(false);
+      }
+    };
+
+    initializeSession();
+
+    if (!auth || !isFirebaseEnabled) {
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
         await syncFirebaseProfile(fbUser);
         setIsLoading(false);
-      } else {
-        // If not logged into Firebase, check if local server token exists
-        const currentTok = localStorage.getItem(TOKEN_KEY);
-        if (currentTok) {
-          fetchCurrentUser(currentTok);
-        } else {
-          // Initialize active student session by default
-          initializeDemoSession();
-        }
+      } else if (!localStorage.getItem(TOKEN_KEY)) {
+        setUser(null);
+        setToken(null);
+        setIsCloudSynced(false);
+        setIsLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, []);
-
-  const initializeDemoSession = async () => {
-    try {
-      const res = await fetch('/api/auth/demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem(TOKEN_KEY, data.token);
-        setToken(data.token);
-        setUser(data.user);
-        setIsCloudSynced(false);
-      }
-    } catch (err) {
-      console.warn('Auto demo session notice:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Fetch current user if token exists
   const fetchCurrentUser = async (authToken: string) => {
@@ -174,18 +199,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(data.user);
         setToken(authToken);
       } else {
-        // Recover with valid demo session
-        await initializeDemoSession();
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem(TOKEN_KEY);
       }
     } catch (err) {
       console.error('Error fetching authenticated user:', err);
-      await initializeDemoSession();
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem(TOKEN_KEY);
     } finally {
       setIsLoading(false);
     }
   };
 
   const loginWithGoogle = async () => {
+    if (!isGoogleAuthEnabled || !auth || !googleProvider) {
+      throw new Error('Google sign-in is disabled on this local environment. Please use email login instead.');
+    }
+
     setIsLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -205,14 +237,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let firebaseSuccess = false;
 
     // 1. Attempt Firebase Email/Password Sign-In if enabled
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (userCredential.user) {
-        firebaseSuccess = true;
-        await syncFirebaseProfile(userCredential.user);
+    if (auth) {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        if (userCredential.user) {
+          firebaseSuccess = true;
+          await syncFirebaseProfile(userCredential.user);
+        }
+      } catch (fbErr: any) {
+        console.info('Firebase direct email sign-in status:', fbErr.code || fbErr.message);
       }
-    } catch (fbErr: any) {
-      console.info('Firebase direct email sign-in status:', fbErr.code || fbErr.message);
     }
 
     // 2. Full-stack authenticated backend fallback
@@ -262,10 +296,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let registeredSuccessfully = false;
 
     // 1. Attempt creating user in Firebase Auth
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, params.email, params.password);
-      fbUser = userCredential.user;
-
+    if (auth) {
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, params.email, params.password);
+        fbUser = userCredential.user;
       if (fbUser) {
         try {
           await updateFirebaseProfile(fbUser, { displayName: params.name });
@@ -304,8 +338,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await syncFirebaseProfile(fbUser, params);
         registeredSuccessfully = true;
       }
-    } catch (fbErr: any) {
-      console.info('Firebase Auth registration notice (fallback active):', fbErr.code || fbErr.message);
+      } catch (fbErr: any) {
+        console.info('Firebase Auth registration notice (fallback active):', fbErr.code || fbErr.message);
+      }
     }
 
     // 2. Seamless registration fallback into user store & Firestore
@@ -362,33 +397,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const loginDemo = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/auth/demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to log in demo user.');
-      }
-
-      localStorage.setItem(TOKEN_KEY, data.token);
-      setToken(data.token);
-      setUser(data.user);
-      setIsCloudSynced(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (err) {
-      console.warn('Firebase signout:', err);
+    if (auth) {
+      try {
+        await firebaseSignOut(auth);
+      } catch (err) {
+        console.warn('Firebase signout:', err);
+      }
     }
 
     if (token) {
@@ -466,7 +481,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         loginWithGoogle,
         register,
-        loginDemo,
         logout,
         updateProfile,
         refreshUser,

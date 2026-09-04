@@ -1,6 +1,6 @@
 /**
  * CoreStack Learn — AI Personal Lecturer
- * Phase 2: Authentication & Student User Workspace
+ * Personal learning workspace
  */
 
 import React, { useState } from 'react';
@@ -11,7 +11,6 @@ import { PedagogicalDemo } from './components/PedagogicalDemo';
 import { ProblemSolution } from './components/ProblemSolution';
 import { HowItWorks } from './components/HowItWorks';
 import { Features } from './components/Features';
-import { ArchitectureViewer } from './components/ArchitectureViewer';
 import { Footer } from './components/Footer';
 import { AuthPreviewModal } from './components/AuthPreviewModal';
 import { HowItWorksModal } from './components/HowItWorksModal';
@@ -90,9 +89,6 @@ function MainContent() {
 
       {/* Core Features Grid */}
       <Features />
-
-      {/* Architecture & 12-Phase Roadmap Viewer */}
-      <ArchitectureViewer />
 
       {/* Footer & Final Call to Action */}
       <Footer

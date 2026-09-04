@@ -164,7 +164,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
     const timer1 = setTimeout(() => setProcessingStage(2), 400);
     const timer2 = setTimeout(() => setProcessingStage(3), 900);
 
-    const effectiveToken = propToken || contextToken || localStorage.getItem('corestack_learn_auth_token') || 'csl_tok_demo_active_student';
+    const effectiveToken = propToken || contextToken || localStorage.getItem('corestack_learn_auth_token');
 
     try {
       const res = await fetch('/api/student/materials/upload', {
@@ -214,7 +214,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
     const timer1 = setTimeout(() => setProcessingStage(2), 400);
     const timer2 = setTimeout(() => setProcessingStage(3), 900);
 
-    const effectiveToken = propToken || contextToken || localStorage.getItem('corestack_learn_auth_token') || 'csl_tok_demo_active_student';
+    const effectiveToken = propToken || contextToken || localStorage.getItem('corestack_learn_auth_token');
 
     try {
       const res = await fetch('/api/student/materials/load-pack', {
@@ -265,7 +265,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
             <div>
               <h3 className="text-lg font-bold text-slate-900">Ingest Study Material</h3>
               <p className="text-xs text-slate-500 font-medium">
-                Phase 4 & 5: Multi-Format Parsing, Smart Chunking & Concept Graphing
+                Multi-Format Parsing, Smart Chunking & Concept Graphing
               </p>
             </div>
           </div>

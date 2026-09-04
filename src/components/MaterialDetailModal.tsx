@@ -20,6 +20,9 @@ import {
 import { StudyMaterial, DocumentChunk, Course, Topic, Concept } from '../types/database';
 import { StudyPackExportModal } from './StudyPackExportModal';
 
+const formatCourseTitle = (title: string) =>
+  title.replace(/\bone\s+hundred\s+and\s+one\b/gi, '101');
+
 interface MaterialDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -106,7 +109,7 @@ export const MaterialDetailModal: React.FC<MaterialDetailModalProps> = ({
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-1">
-                {details?.material.title || 'Course Material Details'}
+                {details?.material.title ? formatCourseTitle(details.material.title) : 'Course Material Details'}
               </h2>
             </div>
           </div>
