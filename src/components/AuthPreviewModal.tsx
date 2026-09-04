@@ -12,7 +12,7 @@ interface AuthModalProps {
 }
 
 export const AuthPreviewModal: React.FC<AuthModalProps> = ({ isOpen, mode: initialMode, onClose, onSuccess }) => {
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, demoLogin, register, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -84,7 +84,7 @@ export const AuthPreviewModal: React.FC<AuthModalProps> = ({ isOpen, mode: initi
     setError(null);
     setIsLoading(true);
     try {
-      await login('alex.student@corestack.edu', 'learn123');
+      await demoLogin();
       onClose();
       if (onSuccess) onSuccess();
     } catch (err: any) {

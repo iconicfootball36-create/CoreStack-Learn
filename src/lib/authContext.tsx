@@ -35,6 +35,7 @@ interface AuthContextType {
   isLoading: boolean;
   isCloudSynced: boolean;
   login: (email: string, password: string) => Promise<void>;
+  demoLogin: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (params: RegisterParams) => Promise<void>;
   logout: () => void;
@@ -297,6 +298,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const demoLogin = async () => {
+    if (!auth) {
+      throw new Error('Firebase is not configured for this deployment.');
+    }
+
+    const demoEmail = 'alex.student@corestack.edu';
+    const demoPassword = 'learn123';
+    let demoUser: FirebaseUser;
+
+    try {
+      demoUser = (await signInWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
+    } catch (error: any) {
+      if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('Enable Email/Password under Firebase Console → Authentication → Sign-in method before using Demo Login.');
+      }
+      if (!['auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(error.code)) {
+        throw new Error(error.message || 'Demo login failed.');
+      }
+
+      demoUser = (await createUserWithEmailAndPassword(auth, demoEmail, demoPassword)).user;
+      await updateFirebaseProfile(demoUser, { displayName: 'Abdulsalam' });
+    }
+
+    await syncFirebaseProfile(demoUser, {
+      name: 'Abdulsalam',
+      email: demoEmail,
+      focusSubject: 'General Studies',
+    });
+  };
+
   const register = async (params: RegisterParams) => {
     setIsLoading(true);
     let fbUser: FirebaseUser | null = null;
@@ -493,6 +524,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         isCloudSynced,
         login,
+        demoLogin,
         loginWithGoogle,
         register,
         logout,
