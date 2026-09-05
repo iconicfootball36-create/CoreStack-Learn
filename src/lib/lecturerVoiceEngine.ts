@@ -137,29 +137,30 @@ export function findBestVoiceForPersona(
 ): SpeechSynthesisVoice | null {
   if (!availableVoices || availableVoices.length === 0) return null;
 
-  // 1. Try to match by preferred voice keywords
+  // 1. Match persona names only; language codes must not decide gender.
   for (const keyword of persona.preferredVoiceKeywords) {
+    if (/^en(-|_)?[a-z]{2}$/i.test(keyword)) continue;
     const match = availableVoices.find(
-      (v) =>
-        v.name.toLowerCase().includes(keyword.toLowerCase()) ||
-        v.lang.toLowerCase().includes(keyword.toLowerCase())
+      (v) => v.name.toLowerCase().includes(keyword.toLowerCase())
     );
     if (match) return match;
   }
 
-  // 2. Try to match by gender/language if possible
+  // 2. Use voice-name gender cues before falling back to language.
   const englishVoices = availableVoices.filter((v) => v.lang.startsWith('en'));
   if (englishVoices.length > 0) {
+    const femalePattern = /female|woman|girl|samantha|victoria|karen|zira|serena|sonia|libby|hazel|susan|jenny|aria|emma|ava/i;
+    const malePattern = /male|man|guy|david|alex|daniel|oliver|ryan|arthur|george|mark|james|thomas|brian|richard|william/i;
+
     if (persona.gender === 'female') {
-      const femaleMatch = englishVoices.find((v) =>
-        /female|woman|girl|samantha|victoria|karen|zira|serena|sonia|libby/i.test(v.name)
-      );
+      const femaleMatch = englishVoices.find((v) => femalePattern.test(v.name));
       if (femaleMatch) return femaleMatch;
     } else {
-      const maleMatch = englishVoices.find((v) =>
-        /male|man|guy|david|alex|daniel|oliver|ryan|arthur|guy|george/i.test(v.name)
-      );
+      const maleMatch = englishVoices.find((v) => malePattern.test(v.name));
       if (maleMatch) return maleMatch;
+
+      const nonFemaleMatch = englishVoices.find((v) => !femalePattern.test(v.name));
+      if (nonFemaleMatch) return nonFemaleMatch;
     }
     return englishVoices[0];
   }
